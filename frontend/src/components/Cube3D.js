@@ -12,6 +12,14 @@ extend({ OrbitControls });
  */
 function Facelet({ position, color, onClick, isSelected }) {
   const meshRef = useRef();
+  const materialRef = useRef();
+  
+  // Update material color when color prop changes
+  useEffect(() => {
+    if (materialRef.current) {
+      materialRef.current.color.set(COLOR_MAP[color] || '#333333');
+    }
+  }, [color]);
   
   return (
     <mesh
@@ -29,6 +37,7 @@ function Facelet({ position, color, onClick, isSelected }) {
       {/* Facelet size: 0.98 to leave small gaps between stickers */}
       <boxGeometry args={[0.98, 0.98, 0.05]} />
       <meshStandardMaterial
+        ref={materialRef}
         color={COLOR_MAP[color] || '#333333'}
         metalness={0.1}
         roughness={0.3}

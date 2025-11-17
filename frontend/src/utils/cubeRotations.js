@@ -177,16 +177,16 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
     ? adjacentMoves[face].clockwise 
     : adjacentMoves[face].counterclockwise;
   
-  // Store the values that will be overwritten
-  const temp = moves.map(move => 
+  // Store the original values from all source positions
+  const sourceValues = moves.map(move => 
     move.from.indices.map(idx => result[getStickerIndex(move.from.face, idx)])
   );
   
-  // Apply the moves in reverse order to avoid overwriting
-  for (let i = moves.length - 1; i >= 0; i--) {
+  // Apply the moves: each target gets values from the previous source
+  for (let i = 0; i < moves.length; i++) {
     const move = moves[i];
-    const nextMove = moves[(i + 1) % moves.length];
-    const values = temp[(i + 1) % moves.length];
+    const sourceIndex = (i - 1 + moves.length) % moves.length; // Previous source
+    const values = sourceValues[sourceIndex];
     
     move.to.indices.forEach((toIdx, j) => {
       result[getStickerIndex(move.to.face, toIdx)] = values[j];

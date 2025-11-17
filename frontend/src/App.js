@@ -8,6 +8,7 @@ import {
   setFaceletColor, 
   validateCubeString 
 } from './utils/cubeState';
+import { applyMove, parseSolution } from './utils/cubeRotations';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -21,6 +22,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoRotate, setAutoRotate] = useState(false);
+  const [initialCubeState, setInitialCubeState] = useState(null); // Store initial state when solution is received
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1); // Track which move we're on
 
   // Load cube state from localStorage on mount
   useEffect(() => {
@@ -47,6 +50,8 @@ function App() {
     setSolutionData(null);
     setError(null);
     setSelectedFacelet(null);
+    setInitialCubeState(null);
+    setCurrentMoveIndex(-1);
   };
 
   const handleSubmit = async (e) => {
@@ -82,11 +87,15 @@ function App() {
         }
       );
 
-      setSolution(response.data.solution);
+      const solutionString = response.data.solution;
+      setSolution(solutionString);
       setSolutionData({
         moves: response.data.moves,
         time: response.data.time,
       });
+      // Store the initial cube state for animation
+      setInitialCubeState(cubeString);
+      setCurrentMoveIndex(-1);
     } catch (err) {
       console.error('Error solving cube:', err);
       if (err.response) {
@@ -109,11 +118,55 @@ function App() {
     }
   };
 
-  const handleAnimateMove = (move, reverse = false) => {
-    // This would trigger cube animation
-    // For now, we'll just log it - animation can be added later
-    console.log('Animate move:', move, reverse ? '(reverse)' : '');
-  };
+  const handleAnimateMove = useCallback((move, reverse = false) => {
+    if (!initialCubeState || !solution) return;
+    
+    // Parse the solution to get all moves
+    const moves = parseSolution(solution);
+    
+    // Calculate target index based on current index
+    let targetIndex = currentMoveIndex;
+    if (move === null) {
+      // Reset to initial state
+      targetIndex = -1;
+    } else if (reverse) {
+      targetIndex = Math.max(-1, currentMoveIndex - 1);
+    } else {
+      targetIndex = Math.min(moves.length - 1, currentMoveIndex + 1);
+    }
+    
+    // Apply all moves up to the target index
+    let newCubeState = initialCubeState;
+    for (let i = 0; i <= targetIndex; i++) {
+      if (i < moves.length) {
+        newCubeState = applyMove(newCubeState, moves[i]);
+      }
+    }
+    
+    setCubeString(newCubeState);
+  }, [initialCubeState, solution, currentMoveIndex]);
+  
+  const handleMoveIndexChange = useCallback((newIndex) => {
+    setCurrentMoveIndex(newIndex);
+    // Trigger animation update
+    if (initialCubeState && solution) {
+      const moves = parseSolution(solution);
+      let newCubeState = initialCubeState;
+      for (let i = 0; i <= newIndex; i++) {
+        if (i < moves.length) {
+          newCubeState = applyMove(newCubeState, moves[i]);
+        }
+      }
+      setCubeString(newCubeState);
+    }
+  }, [initialCubeState, solution]);
+  
+  // Reset cube to initial state when solution changes
+  useEffect(() => {
+    if (initialCubeState && currentMoveIndex === -1) {
+      setCubeString(initialCubeState);
+    }
+  }, [initialCubeState, currentMoveIndex]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -216,6 +269,8 @@ function App() {
               moves={solutionData?.moves}
               solveTime={solutionData?.time}
               onAnimateMove={handleAnimateMove}
+              currentMoveIndex={currentMoveIndex}
+              onMoveIndexChange={handleMoveIndexChange}
             />
           )}
 

@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-export default function SolutionDisplay({ solution, moves, solveTime, onAnimateMove }) {
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+export default function SolutionDisplay({ 
+  solution, 
+  moves, 
+  solveTime, 
+  onAnimateMove, 
+  currentMoveIndex: externalMoveIndex,
+  onMoveIndexChange 
+}) {
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(externalMoveIndex ?? -1);
   const [isPlaying, setIsPlaying] = useState(false);
   
   const moveList = useMemo(() => {
@@ -9,25 +16,37 @@ export default function SolutionDisplay({ solution, moves, solveTime, onAnimateM
     return solution.split(' ').filter(m => m.trim());
   }, [solution]);
   
+  // Sync with external move index if provided
+  useEffect(() => {
+    if (externalMoveIndex !== undefined) {
+      setCurrentMoveIndex(externalMoveIndex);
+    }
+  }, [externalMoveIndex]);
+  
   const handleNextMove = useCallback(() => {
-    setCurrentMoveIndex(prevIndex => {
-      if (prevIndex < moveList.length - 1) {
-        const nextIndex = prevIndex + 1;
-        if (onAnimateMove) {
-          onAnimateMove(moveList[nextIndex]);
-        }
-        return nextIndex;
+    const nextIndex = currentMoveIndex + 1;
+    if (nextIndex < moveList.length) {
+      if (onAnimateMove) {
+        onAnimateMove(moveList[nextIndex], false);
       }
-      return prevIndex;
-    });
-  }, [moveList, onAnimateMove]);
+      if (onMoveIndexChange) {
+        onMoveIndexChange(nextIndex);
+      } else {
+        setCurrentMoveIndex(nextIndex);
+      }
+    }
+  }, [moveList, onAnimateMove, currentMoveIndex, onMoveIndexChange]);
   
   useEffect(() => {
     if (solution) {
-      setCurrentMoveIndex(-1);
+      const resetIndex = -1;
+      setCurrentMoveIndex(resetIndex);
+      if (onMoveIndexChange) {
+        onMoveIndexChange(resetIndex);
+      }
       setIsPlaying(false);
     }
-  }, [solution]);
+  }, [solution, onMoveIndexChange]);
   
   // Auto-play moves
   useEffect(() => {
@@ -36,7 +55,7 @@ export default function SolutionDisplay({ solution, moves, solveTime, onAnimateM
     if (currentMoveIndex < moveList.length - 1) {
       const timer = setTimeout(() => {
         handleNextMove();
-      }, 1000); // 1 second per move
+      }, 800); // 800ms per move for smoother animation
       return () => clearTimeout(timer);
     } else if (currentMoveIndex >= moveList.length - 1) {
       setIsPlaying(false);
@@ -48,16 +67,20 @@ export default function SolutionDisplay({ solution, moves, solveTime, onAnimateM
   }
   
   const handlePreviousMove = () => {
-    setCurrentMoveIndex(prevIndex => {
-      if (prevIndex > -1) {
-        const prevIdx = prevIndex - 1;
-        if (onAnimateMove && prevIdx >= 0) {
-          onAnimateMove(moveList[prevIdx], true); // Reverse move
-        }
-        return prevIdx;
+    const prevIdx = currentMoveIndex - 1;
+    if (prevIdx >= -1) {
+      if (onAnimateMove && prevIdx >= 0) {
+        onAnimateMove(moveList[prevIdx], true); // Reverse move
+      } else if (onAnimateMove && prevIdx === -1) {
+        // Reset to initial state
+        onAnimateMove(null, true);
       }
-      return prevIndex;
-    });
+      if (onMoveIndexChange) {
+        onMoveIndexChange(prevIdx);
+      } else {
+        setCurrentMoveIndex(prevIdx);
+      }
+    }
   };
   
   const handlePlayPause = () => {
@@ -65,8 +88,16 @@ export default function SolutionDisplay({ solution, moves, solveTime, onAnimateM
   };
   
   const handleReset = () => {
-    setCurrentMoveIndex(-1);
+    const resetIndex = -1;
+    if (onMoveIndexChange) {
+      onMoveIndexChange(resetIndex);
+    } else {
+      setCurrentMoveIndex(resetIndex);
+    }
     setIsPlaying(false);
+    if (onAnimateMove) {
+      onAnimateMove(null, true); // Reset to initial
+    }
   };
   
   return (
