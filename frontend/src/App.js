@@ -8,7 +8,7 @@ import {
   setFaceletColor, 
   validateCubeString 
 } from './utils/cubeState';
-import { applyMove, parseSolution } from './utils/cubeRotations';
+import { applyMove, parseSolution, applySolution } from './utils/cubeRotations';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -96,6 +96,28 @@ function App() {
       // Store the initial cube state for animation
       setInitialCubeState(cubeString);
       setCurrentMoveIndex(-1);
+      
+      // Debug: Verify the solution works
+      console.log('Initial cube state:', cubeString);
+      console.log('Solution:', solutionString);
+      
+      // Test: Apply the solution and check if it results in solved state
+      const finalState = applySolution(cubeString, solutionString);
+      const solvedState = resetCube();
+      console.log('Final state after solution:', finalState);
+      console.log('Expected solved state:', solvedState);
+      console.log('States match:', finalState === solvedState);
+      
+      if (finalState !== solvedState) {
+        console.warn('WARNING: Solution does not result in solved state!');
+        console.warn('This indicates a bug in the rotation logic.');
+        // Show differences
+        for (let i = 0; i < finalState.length; i++) {
+          if (finalState[i] !== solvedState[i]) {
+            console.warn(`Difference at index ${i}: got '${finalState[i]}', expected '${solvedState[i]}'`);
+          }
+        }
+      }
     } catch (err) {
       console.error('Error solving cube:', err);
       if (err.response) {

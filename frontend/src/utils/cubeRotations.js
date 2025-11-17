@@ -70,12 +70,16 @@ function rotateFace180(cubeString, face) {
 /**
  * Rotate the adjacent edges and corners when a face is rotated
  * This is the complex part - we need to rotate the stickers on adjacent faces
+ * 
+ * For each face rotation, we need to cycle 4 sets of 3 stickers (the edges of adjacent faces)
  */
 function rotateAdjacentStickers(cubeString, face, clockwise) {
+  // Create a copy to modify
   let result = cubeString.split('');
   
   // Define which stickers on adjacent faces need to move for each face rotation
-  // This is the standard Rubik's Cube move mapping
+  // Format: [source_face, [source_indices], target_face, [target_indices]]
+  // When moving to opposite faces (B), indices may need reversal
   const adjacentMoves = {
     'U': {
       clockwise: [
@@ -177,19 +181,29 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
     ? adjacentMoves[face].clockwise 
     : adjacentMoves[face].counterclockwise;
   
-  // Store the original values from all source positions
+  // Store the original values from all source positions BEFORE any modifications
+  // We need to read from the original cubeString, not the modified result
+  const originalCube = cubeString.split('');
   const sourceValues = moves.map(move => 
-    move.from.indices.map(idx => result[getStickerIndex(move.from.face, idx)])
+    move.from.indices.map(idx => originalCube[getStickerIndex(move.from.face, idx)])
   );
   
-  // Apply the moves: each target gets values from the previous source
+  // For a 4-cycle: if moves are A->B, B->C, C->D, D->A
+  // Then: B gets A's value, C gets B's value, D gets C's value, A gets D's value
+  // So target at index i gets source value from index i (direct mapping)
+  // But wait - for a cycle, we need: B gets A, C gets B, D gets C, A gets D
+  // If moves[0] is A->B, then B should get A's value (sourceValues[0])
+  // If moves[1] is B->C, then C should get B's value (sourceValues[1])
+  // So target i gets sourceValues[i]
   for (let i = 0; i < moves.length; i++) {
     const move = moves[i];
-    const sourceIndex = (i - 1 + moves.length) % moves.length; // Previous source
-    const values = sourceValues[sourceIndex];
+    // Each target gets the value from its corresponding source
+    const values = sourceValues[i];
     
+    // Apply values to target positions
     move.to.indices.forEach((toIdx, j) => {
-      result[getStickerIndex(move.to.face, toIdx)] = values[j];
+      const targetIndex = getStickerIndex(move.to.face, toIdx);
+      result[targetIndex] = values[j];
     });
   }
   
