@@ -98,7 +98,8 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
     },
     'R': {
       clockwise: [
-        // Front right column -> Down right column -> Back left column (reversed) -> Up right column -> Front right column
+        // Front right column -> Down right column -> Back right column (reversed) -> Up right column -> Front right column
+        // B's right column (from front view) = B's left column from B's perspective = [0,3,6] but reversed = [6,3,0]
         { from: { face: 'F', indices: [2, 5, 8] }, to: { face: 'D', indices: [2, 5, 8] } },
         { from: { face: 'D', indices: [2, 5, 8] }, to: { face: 'B', indices: [6, 3, 0] } },
         { from: { face: 'B', indices: [6, 3, 0] }, to: { face: 'U', indices: [2, 5, 8] } },
@@ -143,7 +144,8 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
     },
     'L': {
       clockwise: [
-        // Front left column -> Up left column -> Back right column (reversed) -> Down left column -> Front left column
+        // Front left column -> Up left column -> Back left column (reversed) -> Down left column -> Front left column
+        // B's left column (from front view) = B's right column from B's perspective = [2,5,8] but reversed = [8,5,2]
         { from: { face: 'F', indices: [0, 3, 6] }, to: { face: 'U', indices: [0, 3, 6] } },
         { from: { face: 'U', indices: [0, 3, 6] }, to: { face: 'B', indices: [8, 5, 2] } },
         { from: { face: 'B', indices: [8, 5, 2] }, to: { face: 'D', indices: [0, 3, 6] } },
@@ -188,13 +190,10 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
     move.from.indices.map(idx => originalCube[getStickerIndex(move.from.face, idx)])
   );
   
-  // For a 4-cycle: if moves are A->B, B->C, C->D, D->A
-  // Then: B gets A's value, C gets B's value, D gets C's value, A gets D's value
-  // So target at index i gets source value from index i (direct mapping)
-  // But wait - for a cycle, we need: B gets A, C gets B, D gets C, A gets D
-  // If moves[0] is A->B, then B should get A's value (sourceValues[0])
-  // If moves[1] is B->C, then C should get B's value (sourceValues[1])
-  // So target i gets sourceValues[i]
+  // For a 4-cycle: if moves define F->D, D->B, B->U, U->F
+  // This means: F's value goes to D, D's value goes to B, B's value goes to U, U's value goes to F
+  // So: D gets F's value (sourceValues[0]), B gets D's value (sourceValues[1]), etc.
+  // Therefore: target at index i gets sourceValues[i] (direct mapping)
   for (let i = 0; i < moves.length; i++) {
     const move = moves[i];
     // Each target gets the value from its corresponding source
@@ -232,18 +231,18 @@ export function applyMove(cubeString, move) {
   let result = cubeString;
   
   if (modifier === "'") {
-    // Counterclockwise
+    // Counterclockwise (prime notation)
     result = rotateFaceCounterclockwise(result, face);
-    result = rotateAdjacentStickers(result, face, false);
+    result = rotateAdjacentStickers(result, face, true); // Flipped: was false
   } else if (modifier === '2') {
     // 180 degrees
     result = rotateFace180(result, face);
     result = rotateAdjacentStickers(result, face, true);
     result = rotateAdjacentStickers(result, face, true);
   } else {
-    // Clockwise
+    // Clockwise (no prime)
     result = rotateFaceClockwise(result, face);
-    result = rotateAdjacentStickers(result, face, true);
+    result = rotateAdjacentStickers(result, face, false); // Flipped: was true
   }
   
   return result;

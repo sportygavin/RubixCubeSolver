@@ -101,6 +101,15 @@ function App() {
       console.log('Initial cube state:', cubeString);
       console.log('Solution:', solutionString);
       
+      // Test basic rotation logic first
+      const { testRInverse, testR4, testRLIndependence } = await import('./utils/testCubeRotations');
+      const rTest = testRInverse();
+      const r4Test = testR4();
+      const rlTest = testRLIndependence();
+      console.log('R + R\' test:', rTest.isCorrect ? 'PASS' : 'FAIL', rTest);
+      console.log('R4 test:', r4Test.isCorrect ? 'PASS' : 'FAIL', r4Test);
+      console.log('R/L Independence test:', (rlTest.lFaceUnchanged && rlTest.rFaceUnchanged) ? 'PASS' : 'FAIL', rlTest);
+      
       // Test: Apply the solution and check if it results in solved state
       const finalState = applySolution(cubeString, solutionString);
       const solvedState = resetCube();
@@ -111,10 +120,17 @@ function App() {
       if (finalState !== solvedState) {
         console.warn('WARNING: Solution does not result in solved state!');
         console.warn('This indicates a bug in the rotation logic.');
-        // Show differences
-        for (let i = 0; i < finalState.length; i++) {
+        // Show first 20 differences
+        let diffCount = 0;
+        for (let i = 0; i < finalState.length && diffCount < 20; i++) {
           if (finalState[i] !== solvedState[i]) {
-            console.warn(`Difference at index ${i}: got '${finalState[i]}', expected '${solvedState[i]}'`);
+            const face = Math.floor(i / 9);
+            const faceNames = ['U', 'R', 'F', 'D', 'L', 'B'];
+            const posInFace = i % 9;
+            const row = Math.floor(posInFace / 3);
+            const col = posInFace % 3;
+            console.warn(`${faceNames[face]}[${row},${col}] (index ${i}): got '${finalState[i]}', expected '${solvedState[i]}'`);
+            diffCount++;
           }
         }
       }
