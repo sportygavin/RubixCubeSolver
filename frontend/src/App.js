@@ -8,7 +8,7 @@ import {
   setFaceletColor, 
   validateCubeString 
 } from './utils/cubeState';
-import { applyMove, parseSolution, applySolution } from './utils/cubeRotations';
+import { applyMove, parseSolution, applySolution, generateScramble } from './utils/cubeRotations';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -46,6 +46,18 @@ function App() {
 
   const handleReset = () => {
     setCubeString(resetCube());
+    setSolution(null);
+    setSolutionData(null);
+    setError(null);
+    setSelectedFacelet(null);
+    setInitialCubeState(null);
+    setCurrentMoveIndex(-1);
+  };
+
+  const handleScramble = () => {
+    const solved = resetCube();
+    const scrambleMoves = generateScramble(25);
+    setCubeString(applySolution(solved, scrambleMoves));
     setSolution(null);
     setSolutionData(null);
     setError(null);
@@ -103,12 +115,19 @@ function App() {
       
       // Test basic rotation logic first
       const { testRInverse, testR4, testRLIndependence } = await import('./utils/testCubeRotations');
+      const { testR2, testAllBasicMoves } = await import('./utils/testRotationOrientation');
+      
       const rTest = testRInverse();
       const r4Test = testR4();
       const rlTest = testRLIndependence();
+      const r2Test = testR2();
+      const allMovesTest = testAllBasicMoves();
+      
       console.log('R + R\' test:', rTest.isCorrect ? 'PASS' : 'FAIL', rTest);
+      console.log('R2 test:', r2Test.isCorrect ? 'PASS' : 'FAIL', r2Test);
       console.log('R4 test:', r4Test.isCorrect ? 'PASS' : 'FAIL', r4Test);
       console.log('R/L Independence test:', (rlTest.lFaceUnchanged && rlTest.rFaceUnchanged) ? 'PASS' : 'FAIL', rlTest);
+      console.log('All basic moves test:', allMovesTest);
       
       // Test: Apply the solution and check if it results in solved state
       const finalState = applySolution(cubeString, solutionString);
@@ -120,19 +139,43 @@ function App() {
       if (finalState !== solvedState) {
         console.warn('WARNING: Solution does not result in solved state!');
         console.warn('This indicates a bug in the rotation logic.');
-        // Show first 20 differences
-        let diffCount = 0;
-        for (let i = 0; i < finalState.length && diffCount < 20; i++) {
+        
+        // Group differences by face and position type (corner, edge, center)
+        const faceNames = ['U', 'R', 'F', 'D', 'L', 'B'];
+        const differences = {
+          corners: [],
+          edges: [],
+          centers: []
+        };
+        
+        for (let i = 0; i < finalState.length; i++) {
           if (finalState[i] !== solvedState[i]) {
             const face = Math.floor(i / 9);
-            const faceNames = ['U', 'R', 'F', 'D', 'L', 'B'];
             const posInFace = i % 9;
             const row = Math.floor(posInFace / 3);
             const col = posInFace % 3;
-            console.warn(`${faceNames[face]}[${row},${col}] (index ${i}): got '${finalState[i]}', expected '${solvedState[i]}'`);
-            diffCount++;
+            const isCorner = (row === 0 || row === 2) && (col === 0 || col === 2);
+            const isEdge = !isCorner && (row === 0 || row === 2 || col === 0 || col === 2);
+            const isCenter = row === 1 && col === 1;
+            
+            const diff = {
+              face: faceNames[face],
+              position: `[${row},${col}]`,
+              index: i,
+              expected: solvedState[i],
+              got: finalState[i]
+            };
+            
+            if (isCorner) differences.corners.push(diff);
+            else if (isEdge) differences.edges.push(diff);
+            else if (isCenter) differences.centers.push(diff);
           }
         }
+        
+        console.warn('Corner differences:', differences.corners.slice(0, 10));
+        console.warn('Edge differences:', differences.edges.slice(0, 10));
+        console.warn('Center differences:', differences.centers);
+        console.warn(`Total: ${differences.corners.length} corners, ${differences.edges.length} edges, ${differences.centers.length} centers`);
       }
     } catch (err) {
       console.error('Error solving cube:', err);
@@ -275,6 +318,14 @@ function App() {
                 >
                   🔄 Reset Cube
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleScramble}
+                  className="button button-secondary"
+                >
+                  🎲 Scramble
+                </button>
                 
                 <button
                   type="button"
@@ -320,6 +371,7 @@ function App() {
               <li>Drag the cube to rotate the view</li>
               <li>Use keyboard shortcuts: 1-6 to select colors (U, R, F, D, L, B)</li>
               <li>Press Shift+R to toggle auto-rotation</li>
+              <li>Click "Scramble" for a random 25-move scramble from a solved cube</li>
               <li>Click "Solve Cube" to get the solution</li>
             </ul>
           </div>

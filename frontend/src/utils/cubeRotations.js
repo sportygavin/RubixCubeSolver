@@ -186,6 +186,9 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
   // Store the original values from all source positions BEFORE any modifications
   // We need to read from the original cubeString, not the modified result
   const originalCube = cubeString.split('');
+  const oppositeFace = 'B';
+  
+  // Read source values in their stored form
   const sourceValues = moves.map(move => 
     move.from.indices.map(idx => originalCube[getStickerIndex(move.from.face, idx)])
   );
@@ -194,12 +197,58 @@ function rotateAdjacentStickers(cubeString, face, clockwise) {
   // This means: F's value goes to D, D's value goes to B, B's value goes to U, U's value goes to F
   // So: D gets F's value (sourceValues[0]), B gets D's value (sourceValues[1]), etc.
   // Therefore: target at index i gets sourceValues[i] (direct mapping)
+  
+  // Key insight: When a column/row of stickers rotates around the cube, the order is preserved
+  // relative to the rotation direction. But when crossing to/from the opposite face (B),
+  // the orientation flips because B is viewed from the opposite side.
+  // 
+  // When moving TO B: reverse the values (top becomes bottom from B's perspective)
+  // When moving FROM B: reverse the values (convert from B's perspective back to front-view)
+  
   for (let i = 0; i < moves.length; i++) {
     const move = moves[i];
     // Each target gets the value from its corresponding source
-    const values = sourceValues[i];
+    let values = sourceValues[i];
     
-    // Apply values to target positions
+    // Key insight: When a column/row of 3 stickers rotates around the cube,
+    // the order is preserved relative to the rotation direction.
+    // But when crossing to/from the opposite face (B), the physical orientation flips.
+    //
+    // Example for R rotation with column [top, middle, bottom]:
+    // F -> D: [top, middle, bottom] stays [top, middle, bottom] (same orientation)
+    // D -> B: [top, middle, bottom] becomes [bottom, middle, top] (reversed for B)
+    // B -> U: [bottom, middle, top] from B becomes [top, middle, bottom] (reversed from B)
+    // U -> F: [top, middle, bottom] stays [top, middle, bottom] (same orientation)
+    //
+    // So we reverse when crossing TO B and when crossing FROM B.
+    
+    // Check if we're crossing to/from B
+    const fromB = move.from.face === oppositeFace;
+    const toB = move.to.face === oppositeFace;
+    
+    // When a column/row rotates around the cube, the order is preserved.
+    // But when crossing to/from the opposite face (B), the orientation flips.
+    //
+    // When reading FROM B: B stores values in B's perspective, so we need to reverse
+    // to convert to front-view orientation.
+    // When writing TO B: We have front-view orientation, so we need to reverse
+    // to convert to B's perspective for storage.
+    //
+    // The reversed indices for B (like [6,3,0] instead of [0,3,6]) tell us which
+    // positions to read/write, but we still need to reverse the values themselves.
+    
+    // If moving FROM B, reverse to convert from B's perspective to front-view
+    if (fromB) {
+      values = [...values].reverse();
+    }
+    
+    // If moving TO B, reverse to convert from front-view to B's perspective
+    if (toB) {
+      values = [...values].reverse();
+    }
+    
+    // Map values to target positions
+    // The indices already encode where each value should go
     move.to.indices.forEach((toIdx, j) => {
       const targetIndex = getStickerIndex(move.to.face, toIdx);
       result[targetIndex] = values[j];
@@ -235,10 +284,11 @@ export function applyMove(cubeString, move) {
     result = rotateFaceCounterclockwise(result, face);
     result = rotateAdjacentStickers(result, face, true); // Flipped: was false
   } else if (modifier === '2') {
-    // 180 degrees
-    result = rotateFace180(result, face);
-    result = rotateAdjacentStickers(result, face, true);
-    result = rotateAdjacentStickers(result, face, true);
+    // 180 degrees = two 90-degree rotations
+    result = rotateFaceClockwise(result, face);
+    result = rotateAdjacentStickers(result, face, false);
+    result = rotateFaceClockwise(result, face);
+    result = rotateAdjacentStickers(result, face, false);
   } else {
     // Clockwise (no prime)
     result = rotateFaceClockwise(result, face);
@@ -272,6 +322,33 @@ export function applySolution(cubeString, solution) {
  */
 export function parseSolution(solution) {
   return solution.split(' ').filter(m => m.trim());
+}
+
+const SCRAMBLE_FACES = ['U', 'R', 'F', 'D', 'L', 'B'];
+const OPPOSITE_FACE = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+const SCRAMBLE_MODS = ['', "'", '2'];
+
+/**
+ * Random move sequence (face turns only), suitable for scrambling.
+ * Avoids consecutive moves on the same face or its opposite (common WCA-style constraint).
+ * @param {number} length - Number of moves
+ * @returns {string} Space-separated moves (e.g. "R U2 F' ...")
+ */
+export function generateScramble(length = 25) {
+  const moves = [];
+  let lastFace = null;
+
+  for (let i = 0; i < length; i++) {
+    const candidates = SCRAMBLE_FACES.filter(
+      (f) => f !== lastFace && f !== OPPOSITE_FACE[lastFace]
+    );
+    const face = candidates[Math.floor(Math.random() * candidates.length)];
+    const mod = SCRAMBLE_MODS[Math.floor(Math.random() * SCRAMBLE_MODS.length)];
+    moves.push(face + mod);
+    lastFace = face;
+  }
+
+  return moves.join(' ');
 }
 
 
